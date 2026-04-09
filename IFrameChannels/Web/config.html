@@ -22,7 +22,7 @@
                 </div>
 
                 <div class="verticalSection verticalSection-extrabottompadding">
-                    <button type="button" is="emby-button" class="raised button-submit block" onclick="ifcSave()">
+                    <button type="button" id="ifc-save-btn" is="emby-button" class="raised button-submit block">
                         <span>Save</span>
                     </button>
                 </div>
@@ -33,7 +33,7 @@
     <style>
         .ifc-channel-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
         .ifc-channel-row input { flex: 1; }
-        .ifc-remove-btn { background: #cc0000 !important; color: white !important; }
+        .ifc-remove-btn { background: #cc0000 !important; color: white !important; margin: 0 !important; padding: 5px 10px !important; min-width: auto !important; }
     </style>
 
     <script type="text/javascript">
@@ -42,16 +42,16 @@
             const row = document.createElement('div');
             row.className = 'ifc-channel-row';
             row.innerHTML = `
-                <div class="inputContainer" style="flex:1">
+                <div class="inputContainer" style="flex:1; margin:0;">
                     <input type="text" class="emby-input" placeholder="Name" value="${name}" data-field="name" />
                 </div>
-                <div class="inputContainer" style="flex:2">
+                <div class="inputContainer" style="flex:2; margin:0;">
                     <input type="text" class="emby-input" placeholder="URL (iframe)" value="${url}" data-field="url" />
                 </div>
-                <div class="inputContainer" style="flex:1">
+                <div class="inputContainer" style="flex:1; margin:0;">
                     <input type="text" class="emby-input" placeholder="Thumb URL" value="${thumb}" data-field="thumb" />
                 </div>
-                <button type="button" is="emby-button" class="raised ifc-remove-btn" onclick="this.parentElement.remove()">✕</button>
+                <button type="button" is="emby-button" class="ifc-remove-btn" onclick="this.parentElement.remove()">✕</button>
             `;
             list.appendChild(row);
         }
@@ -69,21 +69,24 @@
             });
 
             const config = {
-                LibraryName: document.getElementById('ifc-library-name').value,
+                LibraryName: document.getElementById('ifc-library-name').value || 'Channels',
                 Channels: channels
             };
 
-            ApiClient.post(ApiClient.getUrl('IFrameChannels/Config'), config).then(() => {
+            const url = ApiClient.getUrl('IFrameChannels/Config');
+            ApiClient.post(url, config).then(() => {
                 Dashboard.hideLoadingMsg();
-                Dashboard.alert('Settings saved! Please restart Jellyfin to update the sidebar name.');
+                Dashboard.alert('Settings saved! Please restart Jellyfin.');
             }).catch((err) => {
                 Dashboard.hideLoadingMsg();
-                Dashboard.alert('Error saving: ' + err);
+                console.error('Save failed:', err);
+                Dashboard.alert('Error saving settings. Check server logs.');
             });
         }
 
         document.querySelector('#IFrameChannelsConfigPage').addEventListener('viewshow', function () {
             const page = this;
+            
             ApiClient.getJSON(ApiClient.getUrl('IFrameChannels/Config')).then((data) => {
                 page.querySelector('#ifc-library-name').value = data.LibraryName || 'Channels';
                 const list = page.querySelector('#ifc-channels-list');
@@ -92,6 +95,8 @@
                     data.Channels.forEach(ch => ifcAddChannel(ch.Name, ch.Url, ch.ThumbnailUrl));
                 }
             });
+
+            page.querySelector('#ifc-save-btn').addEventListener('click', ifcSave);
         });
     </script>
 </div>
