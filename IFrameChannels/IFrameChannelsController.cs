@@ -23,34 +23,33 @@ namespace IFrameChannels
         [Authorize]
         public ActionResult<PluginConfiguration> GetConfig()
         {
-            // Pobieramy aktualną konfigurację z instancji pluginu
             var config = Plugin.Instance?.Configuration;
-            if (config == null) return Ok(new PluginConfiguration());
-            return Ok(config);
+            return Ok(config ?? new PluginConfiguration());
         }
 
         [HttpPost("Config")]
-        [Authorize]
+        [Authorize] // Zmienione z RequiresElevation dla testu
         public ActionResult SaveConfig([FromBody] PluginConfiguration newConfig)
         {
             if (Plugin.Instance == null) return StatusCode(500);
-            if (newConfig == null) return BadRequest("No configuration provided");
+            if (newConfig == null) return BadRequest("No config sent");
 
             try 
             {
-                // Aktualizujemy dane w pamięci
-                Plugin.Instance.Configuration.LibraryName = newConfig.LibraryName;
+                _logger.LogInformation("IFrameChannels: Saving new configuration...");
+                
+                // Ręczne przypisanie, aby mieć pewność, że obiekt nie jest nullem
+                Plugin.Instance.Configuration.LibraryName = newConfig.LibraryName ?? "Channels";
                 Plugin.Instance.Configuration.Channels = newConfig.Channels ?? new List<ChannelEntry>();
                 
-                // Zapisujemy do pliku xml
                 Plugin.Instance.SaveConfiguration();
                 
-                _logger.LogInformation("IFrameChannels: Configuration saved successfully.");
+                _logger.LogInformation("IFrameChannels: Configuration saved to XML.");
                 return Ok();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "IFrameChannels: Error saving configuration.");
+                _logger.LogError(ex, "IFrameChannels: Save failed");
                 return StatusCode(500, ex.Message);
             }
         }
