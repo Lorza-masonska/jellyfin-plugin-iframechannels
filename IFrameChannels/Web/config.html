@@ -1,224 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>IFrame Channels</title>
+<div id="IFrameChannelsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button,emby-input,emby-select">
+    <div data-role="content">
+        <div class="content-primary">
+            <div class="verticalSection verticalSection-extrabottompadding">
+                <div class="sectionTitleContainer flex align-items-center">
+                    <h2 class="sectionTitle">IFrame Channels — Configuration</h2>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel" for="ifc-library-name">Library name (shown in sidebar)</label>
+                    <input type="text" id="ifc-library-name" label="Library name" class="emby-input" />
+                    <div class="fieldDescription">Restart Jellyfin after changing this name.</div>
+                </div>
+
+                <div class="verticalSection">
+                    <h3 class="sectionTitle">Channels</h3>
+                    <div id="ifc-channels-list"></div>
+                    <br />
+                    <button type="button" is="emby-button" class="raised button-cancel block" onclick="ifcAddChannel()">
+                        <span>+ Add channel</span>
+                    </button>
+                </div>
+
+                <div class="verticalSection verticalSection-extrabottompadding">
+                    <button type="button" is="emby-button" class="raised button-submit block" onclick="ifcSave()">
+                        <span>Save</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: sans-serif; background: #101010; color: #fff; padding: 24px; }
-        h1 { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
-        .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid #333; }
-        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: #aaa; font-size: 14px; font-weight: 600; background: none; border-top: none; border-left: none; border-right: none; }
-        .tab.active { color: #00a4dc; border-bottom-color: #00a4dc; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-        .card { background: #1a1a1a; border-radius: 8px; overflow: hidden; cursor: pointer; aspect-ratio: 16/9; position: relative; transition: transform 0.15s, box-shadow 0.15s; }
-        .card:hover { transform: scale(1.04); box-shadow: 0 4px 20px rgba(0,164,220,0.35); }
-        .card-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1e3a5f, #0a1a2e); display: flex; align-items: center; justify-content: center; font-size: 42px; }
-        .card-label { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 18px 10px 8px; font-size: 13px; font-weight: 600; }
-        .empty { color: #666; text-align: center; padding: 40px; grid-column: 1/-1; }
-        #player { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 9999; }
-        #player-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: rgba(0,0,0,0.75); z-index: 10000; transition: opacity 0.3s; }
-        #player-bar.hidden { opacity: 0; pointer-events: none; }
-        #back-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 7px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        #back-btn:hover { background: rgba(255,255,255,0.25); }
-        #player-title { font-size: 15px; font-weight: 600; }
-        #player-iframe { width: 100%; height: 100%; border: none; }
-        .field-label { display: block; color: #aaa; font-size: 13px; margin-bottom: 5px; }
-        .field-input { width: 100%; padding: 8px 12px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; margin-bottom: 16px; }
-        .section-title { font-size: 15px; color: #ccc; margin: 20px 0 10px; border-bottom: 1px solid #333; padding-bottom: 6px; }
-        .channel-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-        .channel-row input { flex: 1; padding: 7px 10px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; }
-        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; }
-        .btn-primary { background: #00a4dc; color: #fff; }
-        .btn-secondary { background: #333; color: #fff; margin-right: 8px; }
-        .btn-danger { background: #b00; color: #fff; padding: 6px 12px; }
-        .col-labels { display: flex; gap: 8px; margin-bottom: 4px; }
-        .col-label { flex: 1; font-size: 12px; color: #666; }
-        .save-ok { color: #4caf50; display: none; margin-left: 10px; font-size: 14px; }
-        .err { color: #f44; font-size: 13px; margin-top: 8px; display: none; }
+        .ifc-channel-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .ifc-channel-row input { flex: 1; }
+        .ifc-remove-btn { background: #cc0000 !important; color: white !important; }
     </style>
-</head>
-<body>
 
-<h1>IFrame Channels</h1>
-
-<div class="tabs">
-    <button class="tab active" onclick="showTab('channels')">Channels</button>
-    <button class="tab" onclick="showTab('settings')">Settings</button>
-</div>
-
-<div id="tab-channels" class="tab-content active">
-    <div class="grid" id="grid"><div class="empty">Loading...</div></div>
-</div>
-
-<div id="tab-settings" class="tab-content">
-    <label class="field-label">Library / page name</label>
-    <input type="text" id="lib-name" class="field-input" placeholder="Channels" />
-    <div class="section-title">Channels</div>
-    <div class="col-labels">
-        <span class="col-label">Name</span>
-        <span class="col-label">URL (iframe src)</span>
-        <span class="col-label">Thumbnail URL (optional)</span>
-        <span style="width:48px"></span>
-    </div>
-    <div id="channels-list"></div>
-    <button class="btn btn-secondary" onclick="addChannel()" style="margin-top:4px">+ Add channel</button>
-    <div style="margin-top:24px">
-        <button class="btn btn-primary" onclick="saveConfig()">Save</button>
-        <span class="save-ok" id="save-ok">Saved!</span>
-        <span class="err" id="save-err"></span>
-    </div>
-</div>
-
-<div id="player">
-    <div id="player-bar">
-        <button id="back-btn" onclick="closePlayer()">Back</button>
-        <span id="player-title"></span>
-    </div>
-    <iframe id="player-iframe" allowfullscreen allow="autoplay; fullscreen; encrypted-media"></iframe>
-</div>
-
-<script>
-    var cfg = { LibraryName: 'Channels', Channels: [] };
-    var hideTimer = null;
-
-    /* ── Token: try every known location ── */
-    function getToken() {
-        // 1. ApiClient in current window
-        try { if (window.ApiClient) { var t = window.ApiClient.accessToken(); if (t) return t; } } catch(e) {}
-        // 2. ApiClient in parent window (iframe context)
-        try { if (window.parent && window.parent.ApiClient) { var t2 = window.parent.ApiClient.accessToken(); if (t2) return t2; } } catch(e) {}
-        // 3. top window
-        try { if (window.top && window.top.ApiClient) { var t3 = window.top.ApiClient.accessToken(); if (t3) return t3; } } catch(e) {}
-        return null;
-    }
-
-    function authHeaders(extra) {
-        var h = extra || {};
-        var tok = getToken();
-        if (tok) h['Authorization'] = 'MediaBrowser Token="' + tok + '"';
-        return h;
-    }
-
-    /* ── API ── */
-    function loadConfig() {
-        fetch('/IFrameChannels/Config', { headers: authHeaders() })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
-            .then(function(data) { cfg = data; renderGrid(); renderSettings(); })
-            .catch(function(e) { console.warn('IFrameChannels load:', e); renderGrid(); });
-    }
-
-    function saveConfig() {
-        cfg.LibraryName = document.getElementById('lib-name').value.trim() || 'Channels';
-        cfg.Channels = [];
-        var rows = document.querySelectorAll('.channel-row');
-        for (var i = 0; i < rows.length; i++) {
-            var name = rows[i].querySelector('[data-f="name"]').value.trim();
-            var url = rows[i].querySelector('[data-f="url"]').value.trim();
-            var thumb = rows[i].querySelector('[data-f="thumb"]').value.trim();
-            if (name && url) cfg.Channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
+    <script type="text/javascript">
+        function ifcAddChannel(name = '', url = '', thumb = '') {
+            const list = document.getElementById('ifc-channels-list');
+            const row = document.createElement('div');
+            row.className = 'ifc-channel-row';
+            row.innerHTML = `
+                <div class="inputContainer" style="flex:1">
+                    <input type="text" class="emby-input" placeholder="Name" value="${name}" data-field="name" />
+                </div>
+                <div class="inputContainer" style="flex:2">
+                    <input type="text" class="emby-input" placeholder="URL (iframe)" value="${url}" data-field="url" />
+                </div>
+                <div class="inputContainer" style="flex:1">
+                    <input type="text" class="emby-input" placeholder="Thumb URL" value="${thumb}" data-field="thumb" />
+                </div>
+                <button type="button" is="emby-button" class="raised ifc-remove-btn" onclick="this.parentElement.remove()">✕</button>
+            `;
+            list.appendChild(row);
         }
-        fetch('/IFrameChannels/Config', {
-            method: 'POST',
-            headers: authHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify(cfg)
-        })
-        .then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status + ' — token: ' + (getToken() ? 'found' : 'missing'));
-            var ok = document.getElementById('save-ok');
-            ok.style.display = 'inline';
-            setTimeout(function() { ok.style.display = 'none'; }, 3000);
-            document.getElementById('save-err').style.display = 'none';
-            renderGrid();
-        })
-        .catch(function(e) {
-            var err = document.getElementById('save-err');
-            err.textContent = 'Save failed: ' + e;
-            err.style.display = 'block';
-        });
-    }
 
-    /* ── Grid ── */
-    function renderGrid() {
-        var grid = document.getElementById('grid');
-        grid.innerHTML = '';
-        if (!cfg.Channels || !cfg.Channels.length) {
-            grid.innerHTML = '<div class="empty">No channels yet. Go to <b>Settings</b> to add some.</div>';
-            return;
+        function ifcSave() {
+            Dashboard.showLoadingMsg();
+            const rows = document.querySelectorAll('.ifc-channel-row');
+            const channels = [];
+            
+            rows.forEach(row => {
+                const name = row.querySelector('[data-field="name"]').value;
+                const url = row.querySelector('[data-field="url"]').value;
+                const thumb = row.querySelector('[data-field="thumb"]').value;
+                if (name && url) channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
+            });
+
+            const config = {
+                LibraryName: document.getElementById('ifc-library-name').value,
+                Channels: channels
+            };
+
+            ApiClient.post(ApiClient.getUrl('IFrameChannels/Config'), config).then(() => {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert('Settings saved! Please restart Jellyfin to update the sidebar name.');
+            }).catch((err) => {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert('Error saving: ' + err);
+            });
         }
-        for (var i = 0; i < cfg.Channels.length; i++) {
-            (function(ch) {
-                var card = document.createElement('div');
-                card.className = 'card';
-                card.title = ch.Name;
-                if (ch.ThumbnailUrl) {
-                    card.innerHTML = '<img class="card-thumb" src="' + esc(ch.ThumbnailUrl) + '" alt="' + esc(ch.Name) + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="card-placeholder" style="display:none">&#128250;</div><div class="card-label">' + esc(ch.Name) + '</div>';
-                } else {
-                    card.innerHTML = '<div class="card-placeholder">&#128250;</div><div class="card-label">' + esc(ch.Name) + '</div>';
+
+        document.querySelector('#IFrameChannelsConfigPage').addEventListener('viewshow', function () {
+            const page = this;
+            ApiClient.getJSON(ApiClient.getUrl('IFrameChannels/Config')).then((data) => {
+                page.querySelector('#ifc-library-name').value = data.LibraryName || 'Channels';
+                const list = page.querySelector('#ifc-channels-list');
+                list.innerHTML = '';
+                if (data.Channels) {
+                    data.Channels.forEach(ch => ifcAddChannel(ch.Name, ch.Url, ch.ThumbnailUrl));
                 }
-                card.onclick = function() { openPlayer(ch.Name, ch.Url); };
-                grid.appendChild(card);
-            })(cfg.Channels[i]);
-        }
-    }
-
-    function renderSettings() {
-        document.getElementById('lib-name').value = cfg.LibraryName || 'Channels';
-        document.getElementById('channels-list').innerHTML = '';
-        for (var i = 0; i < (cfg.Channels || []).length; i++) {
-            addChannel(cfg.Channels[i].Name, cfg.Channels[i].Url, cfg.Channels[i].ThumbnailUrl);
-        }
-    }
-
-    function addChannel(name, url, thumb) {
-        name = name || ''; url = url || ''; thumb = thumb || '';
-        var row = document.createElement('div');
-        row.className = 'channel-row';
-        row.innerHTML = '<input type="text" data-f="name" placeholder="e.g. TVP 1" value="' + esc(name) + '" /><input type="text" data-f="url" placeholder="https://..." value="' + esc(url) + '" /><input type="text" data-f="thumb" placeholder="https://... (optional)" value="' + esc(thumb) + '" /><button class="btn btn-danger" onclick="this.parentElement.remove()">X</button>';
-        document.getElementById('channels-list').appendChild(row);
-    }
-
-    /* ── Player ── */
-    function openPlayer(name, url) {
-        document.getElementById('player-title').textContent = name;
-        document.getElementById('player-iframe').src = url;
-        document.getElementById('player').style.display = 'block';
-        resetHide();
-        document.getElementById('player').onmousemove = resetHide;
-        document.getElementById('player').ontouchstart = resetHide;
-    }
-
-    function closePlayer() {
-        document.getElementById('player').style.display = 'none';
-        document.getElementById('player-iframe').src = '';
-        clearTimeout(hideTimer);
-        document.getElementById('player-bar').classList.remove('hidden');
-    }
-
-    function resetHide() {
-        document.getElementById('player-bar').classList.remove('hidden');
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(function() { document.getElementById('player-bar').classList.add('hidden'); }, 3000);
-    }
-
-    /* ── Tabs ── */
-    function showTab(id) {
-        var tabs = document.querySelectorAll('.tab');
-        var names = ['channels', 'settings'];
-        for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', names[i] === id);
-        var contents = document.querySelectorAll('.tab-content');
-        for (var j = 0; j < contents.length; j++) contents[j].classList.remove('active');
-        document.getElementById('tab-' + id).classList.add('active');
-    }
-
-    function esc(s) {
-        return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    loadConfig();
-</script>
-</body>
-</html>
+            });
+        });
+    </script>
+</div>
