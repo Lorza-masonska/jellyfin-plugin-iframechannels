@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IFrame Channels - Configuration</title>
+    <style>
+        .ifc-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1em;
+        }
+        .ifc-channel-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .ifc-channel-row input {
+            flex: 1;
+            padding: 6px 10px;
+            background: #2d2d2d;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+        }
+        .ifc-channel-row button {
+            padding: 6px 12px;
+            background: #cc0000;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .ifc-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+        .ifc-btn-primary { background: #00a4dc; color: #fff; }
+        .ifc-btn-secondary { background: #444; color: #fff; }
+        .ifc-label {
+            display: block;
+            margin-bottom: 4px;
+            color: #aaa;
+            font-size: 13px;
+        }
+        .ifc-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: #2d2d2d;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+        }
+        .ifc-section-title {
+            margin-top: 24px;
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: #fff;
+        }
+        .ifc-success {
+            color: #4caf50;
+            display: none;
+            margin-top: 8px;
+        }
+        .ifc-col-label {
+            color: #aaa;
+            font-size: 12px;
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+<div class="ifc-container">
+    <h2>IFrame Channels — Configuration</h2>
+
+    <label class="ifc-label">Library name (shown in sidebar)</label>
+    <input type="text" id="ifc-library-name" class="ifc-input" placeholder="Channels" />
+
+    <div class="ifc-section-title">Channels</div>
+
+    <div style="display:flex; gap:8px; margin-bottom:4px;">
+        <span class="ifc-col-label">Channel name</span>
+        <span class="ifc-col-label">URL (iframe src)</span>
+        <span class="ifc-col-label">Thumbnail URL (optional)</span>
+        <span style="width:60px;"></span>
+    </div>
+
+    <div id="ifc-channels-list"></div>
+
+    <button class="ifc-btn ifc-btn-secondary" onclick="ifcAddChannel()">+ Add channel</button>
+
+    <div style="margin-top:24px;">
+        <button class="ifc-btn ifc-btn-primary" onclick="ifcSave()">Save</button>
+        <span class="ifc-success" id="ifc-success">✓ Saved!</span>
+    </div>
+</div>
+
+<script>
+    const ApiClient = window.ApiClient;
+
+    async function ifcLoad() {
+        try {
+            const resp = await ApiClient.fetch({
+                type: 'GET',
+                url: ApiClient.getUrl('IFrameChannels/Config')
+            });
+            const data = JSON.parse(resp);
+            document.getElementById('ifc-library-name').value = data.LibraryName || 'Channels';
+            const list = document.getElementById('ifc-channels-list');
+            list.innerHTML = '';
+            (data.Channels || []).forEach(ch => ifcAddChannel(ch.Name, ch.Url, ch.ThumbnailUrl));
+        } catch (e) {
+            console.error('IFrameChannels: failed to load config', e);
+        }
+    }
+
+    function ifcAddChannel(name = '', url = '', thumb = '') {
+        const row = document.createElement('div');
+        row.className = 'ifc-channel-row';
+        row.innerHTML = `
+            <input type="text" placeholder="e.g. TVP 1" value="${escHtml(name)}" data-field="name" />
+            <input type="text" placeholder="https://..." value="${escHtml(url)}" data-field="url" />
+            <input type="text" placeholder="https://... (optional)" value="${escHtml(thumb)}" data-field="thumb" />
+            <button onclick="this.parentElement.remove()">✕</button>
+        `;
+        document.getElementById('ifc-channels-list').appendChild(row);
+    }
+
+    function escHtml(str) {
+        return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function ifcSave() {
+        const rows = document.querySelectorAll('#ifc-channels-list .ifc-channel-row');
+        const channels = [];
+        rows.forEach(row => {
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            const url = row.querySelector('[data-field="url"]').value.trim();
+            const thumb = row.querySelector('[data-field="thumb"]').value.trim();
+            if (name && url) channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
+        });
+
+        const payload = {
+            LibraryName: document.getElementById('ifc-library-name').value.trim() || 'Channels',
+            Channels: channels
+        };
+
+        try {
+            await ApiClient.fetch({
+                type: 'POST',
+                url: ApiClient.getUrl('IFrameChannels/Config'),
+                data: JSON.stringify(payload),
+                contentType: 'application/json'
+            });
+            const s = document.getElementById('ifc-success');
+            s.style.display = 'inline';
+            setTimeout(() => s.style.display = 'none', 3000);
+        } catch (e) {
+            alert('Failed to save: ' + e);
+        }
+    }
+
+    ifcLoad();
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+name: Build Plugin
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore IFrameChannels/IFrameChannels.csproj
+
+    - name: Build
+      run: dotnet build IFrameChannels/IFrameChannels.csproj --configuration Release --no-restore
+
+    - name: Publish
+      run: dotnet publish IFrameChannels/IFrameChannels.csproj --configuration Release --output ./publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: IFrameChannels
+        path: ./publish/IFrameChannels.dll
+
+    - name: Create zip for release
+      if: github.event_name == 'release'
+      run: |
+        cd publish
+        zip -j ../IFrameChannels.zip IFrameChannels.dll
+        cd ..
+
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: IFrameChannels.zip
