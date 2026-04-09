@@ -8,7 +8,7 @@
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="ifc-library-name">Library name (shown in sidebar)</label>
-                    <input type="text" id="ifc-library-name" label="Library name" class="emby-input" />
+                    <input type="text" id="ifc-library-name" class="emby-input" />
                     <div class="fieldDescription">Restart Jellyfin after changing this name.</div>
                 </div>
 
@@ -31,7 +31,7 @@
     </div>
 
     <style>
-        .ifc-channel-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .ifc-channel-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; }
         .ifc-channel-row input { flex: 1; }
         .ifc-remove-btn { background: #cc0000 !important; color: white !important; margin: 0 !important; padding: 5px 10px !important; min-width: auto !important; }
     </style>
@@ -43,21 +43,18 @@
             row.className = 'ifc-channel-row';
             row.innerHTML = `
                 <div class="inputContainer" style="flex:1; margin:0;">
-                    <input type="text" class="emby-input" placeholder="Name" value="${name}" data-field="name" />
+                    <input type="text" class="emby-input ifc-name" placeholder="Name" value="${name}" />
                 </div>
                 <div class="inputContainer" style="flex:2; margin:0;">
-                    <input type="text" class="emby-input" placeholder="URL (iframe)" value="${url}" data-field="url" />
+                    <input type="text" class="emby-input ifc-url" placeholder="URL (iframe)" value="${url}" />
                 </div>
                 <div class="inputContainer" style="flex:1; margin:0;">
-                    <input type="text" class="emby-input" placeholder="Thumb URL" value="${thumb}" data-field="thumb" />
+                    <input type="text" class="emby-input ifc-thumb" placeholder="Thumb URL" value="${thumb}" />
                 </div>
-                <button type="button" is="emby-button" class="ifc-remove-btn btn-remove">✕</button>
+                <button type="button" is="emby-button" class="ifc-remove-btn">✕</button>
             `;
             
-            row.querySelector('.btn-remove').addEventListener('click', function() {
-                row.remove();
-            });
-            
+            row.querySelector('button').onclick = () => row.remove();
             list.appendChild(row);
         }
 
@@ -67,10 +64,12 @@
             const channels = [];
             
             rows.forEach(row => {
-                const name = row.querySelector('[data-field="name"]').value;
-                const url = row.querySelector('[data-field="url"]').value;
-                const thumb = row.querySelector('[data-field="thumb"]').value;
-                if (name && url) channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
+                const name = row.querySelector('.ifc-name').value;
+                const url = row.querySelector('.ifc-url').value;
+                const thumb = row.querySelector('.ifc-thumb').value;
+                if (name && url) {
+                    channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
+                }
             });
 
             const config = {
@@ -78,7 +77,8 @@
                 Channels: channels
             };
 
-            // Używamy ApiClient.fetch zamiast ApiClient.post dla lepszej kompatybilności
+            console.log('Sending config:', config);
+
             ApiClient.fetch({
                 type: 'POST',
                 url: ApiClient.getUrl('IFrameChannels/Config'),
@@ -86,28 +86,26 @@
                 contentType: 'application/json'
             }).then(() => {
                 Dashboard.hideLoadingMsg();
-                Dashboard.alert('Settings saved! Please refresh the page (F5).');
+                Dashboard.alert('Saved! Now RESTART Jellyfin server to see changes.');
             }).catch((err) => {
                 Dashboard.hideLoadingMsg();
-                console.error('Save failed:', err);
-                Dashboard.alert('Error saving settings: ' + err);
+                Dashboard.alert('Error: ' + err);
             });
         }
 
         document.querySelector('#IFrameChannelsConfigPage').addEventListener('viewshow', function () {
             const page = this;
-            
             ApiClient.getJSON(ApiClient.getUrl('IFrameChannels/Config')).then((data) => {
-                page.querySelector('#ifc-library-name').value = data.LibraryName || 'Channels';
-                const list = page.querySelector('#ifc-channels-list');
+                document.getElementById('ifc-library-name').value = data.LibraryName || 'Channels';
+                const list = document.getElementById('ifc-channels-list');
                 list.innerHTML = '';
-                if (data.Channels && data.Channels.length) {
+                if (data.Channels) {
                     data.Channels.forEach(ch => ifcCreateRow(ch.Name, ch.Url, ch.ThumbnailUrl));
                 }
             });
 
-            page.querySelector('#ifc-save-btn').addEventListener('click', ifcSave);
-            page.querySelector('#ifc-add-btn').addEventListener('click', function() { ifcCreateRow(); });
+            document.getElementById('ifc-save-btn').onclick = ifcSave;
+            document.getElementById('ifc-add-btn').onclick = () => ifcCreateRow();
         });
     </script>
 </div>

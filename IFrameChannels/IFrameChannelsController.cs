@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using IFrameChannels.Configuration;
 using MediaBrowser.Controller.Net;
@@ -18,33 +19,40 @@ namespace IFrameChannels
             _logger = logger;
         }
 
-        [HttpGet("Channels")]
-        [Authorize]
-        public ActionResult<List<ChannelEntry>> GetChannels()
-        {
-            var config = Plugin.Instance?.Configuration;
-            return Ok(config?.Channels ?? new List<ChannelEntry>());
-        }
-
         [HttpGet("Config")]
         [Authorize]
         public ActionResult<PluginConfiguration> GetConfig()
         {
+            // Pobieramy aktualną konfigurację z instancji pluginu
             var config = Plugin.Instance?.Configuration;
-            return Ok(config ?? new PluginConfiguration());
+            if (config == null) return Ok(new PluginConfiguration());
+            return Ok(config);
         }
 
         [HttpPost("Config")]
-        [Authorize] // Zmienione z RequiresElevation na zwykłe Authorize dla testu
+        [Authorize]
         public ActionResult SaveConfig([FromBody] PluginConfiguration newConfig)
         {
             if (Plugin.Instance == null) return StatusCode(500);
+            if (newConfig == null) return BadRequest("No configuration provided");
 
-            Plugin.Instance.Configuration.LibraryName = newConfig.LibraryName;
-            Plugin.Instance.Configuration.Channels = newConfig.Channels;
-            Plugin.Instance.SaveConfiguration();
-
-            return Ok();
+            try 
+            {
+                // Aktualizujemy dane w pamięci
+                Plugin.Instance.Configuration.LibraryName = newConfig.LibraryName;
+                Plugin.Instance.Configuration.Channels = newConfig.Channels ?? new List<ChannelEntry>();
+                
+                // Zapisujemy do pliku xml
+                Plugin.Instance.SaveConfiguration();
+                
+                _logger.LogInformation("IFrameChannels: Configuration saved successfully.");
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "IFrameChannels: Error saving configuration.");
+                return StatusCode(500, ex.Message);
+            }
         }
     }
 }
