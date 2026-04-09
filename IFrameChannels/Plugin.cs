@@ -33,15 +33,6 @@ namespace IFrameChannels
                     Name = "IFrameChannels",
                     EmbeddedResourcePath = $"{GetType().Namespace}.Web.config.html",
                     EnableInMainMenu = false
-                },
-                new PluginPageInfo
-                {
-                    Name = "IFrameChannelsView",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.channels.html",
-                    EnableInMainMenu = true,
-                    DisplayName = Instance?.Configuration.LibraryName ?? "Channels",
-                    MenuSection = "library",
-                    MenuIcon = "live_tv"
                 }
             };
         }

@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Web\config.html" />
-    <EmbeddedResource Include="Web\channels.html" />
   </ItemGroup>
 
 </Project>
