@@ -153,16 +153,31 @@
 </div>
 
 <script>
-    const ApiClient = window.ApiClient;
     let hideBarTimer = null;
+
+    function getAuthHeader() {
+        const client = window.ApiClient || (window.Jellyfin && window.Jellyfin.apiClient);
+        if (client && client.accessToken) {
+            return 'MediaBrowser Token="' + client.accessToken() + '"';
+        }
+        try {
+            for (const k of Object.keys(localStorage)) {
+                if (k.startsWith('jellyfin_credentials')) {
+                    const val = JSON.parse(localStorage.getItem(k));
+                    const server = val && val.Servers && val.Servers[0];
+                    if (server && server.AccessToken) return 'MediaBrowser Token="' + server.AccessToken + '"';
+                }
+            }
+        } catch(e) {}
+        return '';
+    }
 
     async function ifcLoadChannels() {
         try {
-            const resp = await ApiClient.fetch({
-                type: 'GET',
-                url: ApiClient.getUrl('IFrameChannels/Config')
+            const resp = await fetch('/IFrameChannels/Config', {
+                headers: { 'Authorization': getAuthHeader() }
             });
-            const data = JSON.parse(resp);
+            const data = await resp.json();
 
             document.getElementById('ifc-page-title').textContent = data.LibraryName || 'Channels';
             document.title = data.LibraryName || 'Channels';

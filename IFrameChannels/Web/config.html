@@ -102,15 +102,37 @@
 </div>
 
 <script>
-    const ApiClient = window.ApiClient;
+    function getApiClient() {
+        return window.ApiClient || (window.Jellyfin && window.Jellyfin.apiClient);
+    }
+
+    function getAuthHeader() {
+        const client = getApiClient();
+        if (client && client.accessToken) {
+            return 'MediaBrowser Token="' + client.accessToken() + '"';
+        }
+        // fallback: try to read from localStorage
+        try {
+            const keys = Object.keys(localStorage);
+            for (const k of keys) {
+                if (k.startsWith('jellyfin_credentials')) {
+                    const val = JSON.parse(localStorage.getItem(k));
+                    const server = val && val.Servers && val.Servers[0];
+                    if (server && server.AccessToken) {
+                        return 'MediaBrowser Token="' + server.AccessToken + '"';
+                    }
+                }
+            }
+        } catch(e) {}
+        return '';
+    }
 
     async function ifcLoad() {
         try {
-            const resp = await ApiClient.fetch({
-                type: 'GET',
-                url: ApiClient.getUrl('IFrameChannels/Config')
+            const resp = await fetch('/IFrameChannels/Config', {
+                headers: { 'Authorization': getAuthHeader() }
             });
-            const data = JSON.parse(resp);
+            const data = await resp.json();
             document.getElementById('ifc-library-name').value = data.LibraryName || 'Channels';
             const list = document.getElementById('ifc-channels-list');
             list.innerHTML = '';
@@ -152,12 +174,15 @@
         };
 
         try {
-            await ApiClient.fetch({
-                type: 'POST',
-                url: ApiClient.getUrl('IFrameChannels/Config'),
-                data: JSON.stringify(payload),
-                contentType: 'application/json'
+            const resp = await fetch('/IFrameChannels/Config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': getAuthHeader()
+                },
+                body: JSON.stringify(payload)
             });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const s = document.getElementById('ifc-success');
             s.style.display = 'inline';
             setTimeout(() => s.style.display = 'none', 3000);
@@ -166,7 +191,16 @@
         }
     }
 
-    ifcLoad();
+    // Wait for ApiClient if loading inside Jellyfin iframe
+    function waitAndLoad() {
+        if (getApiClient()) {
+            ifcLoad();
+        } else {
+            setTimeout(waitAndLoad, 200);
+        }
+    }
+
+    waitAndLoad();
 </script>
 </body>
 </html>
