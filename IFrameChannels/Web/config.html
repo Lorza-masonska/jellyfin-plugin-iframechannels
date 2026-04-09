@@ -16,7 +16,7 @@
                     <h3 class="sectionTitle">Channels</h3>
                     <div id="ifc-channels-list"></div>
                     <br />
-                    <button type="button" is="emby-button" class="raised button-cancel block" onclick="ifcAddChannel()">
+                    <button type="button" is="emby-button" class="raised button-cancel block" id="ifc-add-btn">
                         <span>+ Add channel</span>
                     </button>
                 </div>
@@ -37,7 +37,7 @@
     </style>
 
     <script type="text/javascript">
-        function ifcAddChannel(name = '', url = '', thumb = '') {
+        function ifcCreateRow(name = '', url = '', thumb = '') {
             const list = document.getElementById('ifc-channels-list');
             const row = document.createElement('div');
             row.className = 'ifc-channel-row';
@@ -51,8 +51,13 @@
                 <div class="inputContainer" style="flex:1; margin:0;">
                     <input type="text" class="emby-input" placeholder="Thumb URL" value="${thumb}" data-field="thumb" />
                 </div>
-                <button type="button" is="emby-button" class="ifc-remove-btn" onclick="this.parentElement.remove()">✕</button>
+                <button type="button" is="emby-button" class="ifc-remove-btn btn-remove">✕</button>
             `;
+            
+            row.querySelector('.btn-remove').addEventListener('click', function() {
+                row.remove();
+            });
+            
             list.appendChild(row);
         }
 
@@ -73,14 +78,19 @@
                 Channels: channels
             };
 
-            const url = ApiClient.getUrl('IFrameChannels/Config');
-            ApiClient.post(url, config).then(() => {
+            // Używamy ApiClient.fetch zamiast ApiClient.post dla lepszej kompatybilności
+            ApiClient.fetch({
+                type: 'POST',
+                url: ApiClient.getUrl('IFrameChannels/Config'),
+                data: JSON.stringify(config),
+                contentType: 'application/json'
+            }).then(() => {
                 Dashboard.hideLoadingMsg();
-                Dashboard.alert('Settings saved! Please restart Jellyfin.');
+                Dashboard.alert('Settings saved! Please refresh the page (F5).');
             }).catch((err) => {
                 Dashboard.hideLoadingMsg();
                 console.error('Save failed:', err);
-                Dashboard.alert('Error saving settings. Check server logs.');
+                Dashboard.alert('Error saving settings: ' + err);
             });
         }
 
@@ -91,12 +101,13 @@
                 page.querySelector('#ifc-library-name').value = data.LibraryName || 'Channels';
                 const list = page.querySelector('#ifc-channels-list');
                 list.innerHTML = '';
-                if (data.Channels) {
-                    data.Channels.forEach(ch => ifcAddChannel(ch.Name, ch.Url, ch.ThumbnailUrl));
+                if (data.Channels && data.Channels.length) {
+                    data.Channels.forEach(ch => ifcCreateRow(ch.Name, ch.Url, ch.ThumbnailUrl));
                 }
             });
 
             page.querySelector('#ifc-save-btn').addEventListener('click', ifcSave);
+            page.querySelector('#ifc-add-btn').addEventListener('click', function() { ifcCreateRow(); });
         });
     </script>
 </div>
