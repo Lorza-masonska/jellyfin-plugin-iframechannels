@@ -38,6 +38,7 @@
         .col-labels { display: flex; gap: 8px; margin-bottom: 4px; }
         .col-label { flex: 1; font-size: 12px; color: #666; }
         .save-ok { color: #4caf50; display: none; margin-left: 10px; font-size: 14px; }
+        .err { color: #f44; font-size: 13px; margin-top: 8px; display: none; }
     </style>
 </head>
 <body>
@@ -68,6 +69,7 @@
     <div style="margin-top:24px">
         <button class="btn btn-primary" onclick="saveConfig()">Save</button>
         <span class="save-ok" id="save-ok">Saved!</span>
+        <span class="err" id="save-err"></span>
     </div>
 </div>
 
@@ -83,27 +85,30 @@
     var cfg = { LibraryName: 'Channels', Channels: [] };
     var hideTimer = null;
 
-    function authHeader() {
-        try {
-            var keys = Object.keys(localStorage);
-            for (var i = 0; i < keys.length; i++) {
-                var k = keys[i];
-                if (k.indexOf('jellyfin_credentials') === 0) {
-                    var v = JSON.parse(localStorage.getItem(k));
-                    var tok = v && v.Servers && v.Servers[0] && v.Servers[0].AccessToken;
-                    if (tok) return { 'Authorization': 'MediaBrowser Token="' + tok + '"' };
-                }
-            }
-        } catch(e) {}
-        return {};
+    /* ── Token: try every known location ── */
+    function getToken() {
+        // 1. ApiClient in current window
+        try { if (window.ApiClient) { var t = window.ApiClient.accessToken(); if (t) return t; } } catch(e) {}
+        // 2. ApiClient in parent window (iframe context)
+        try { if (window.parent && window.parent.ApiClient) { var t2 = window.parent.ApiClient.accessToken(); if (t2) return t2; } } catch(e) {}
+        // 3. top window
+        try { if (window.top && window.top.ApiClient) { var t3 = window.top.ApiClient.accessToken(); if (t3) return t3; } } catch(e) {}
+        return null;
     }
 
+    function authHeaders(extra) {
+        var h = extra || {};
+        var tok = getToken();
+        if (tok) h['Authorization'] = 'MediaBrowser Token="' + tok + '"';
+        return h;
+    }
+
+    /* ── API ── */
     function loadConfig() {
-        var headers = authHeader();
-        fetch('/IFrameChannels/Config', { headers: headers })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        fetch('/IFrameChannels/Config', { headers: authHeaders() })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
             .then(function(data) { cfg = data; renderGrid(); renderSettings(); })
-            .catch(function(e) { console.error('IFrameChannels load error', e); renderGrid(); });
+            .catch(function(e) { console.warn('IFrameChannels load:', e); renderGrid(); });
     }
 
     function saveConfig() {
@@ -116,19 +121,27 @@
             var thumb = rows[i].querySelector('[data-f="thumb"]').value.trim();
             if (name && url) cfg.Channels.push({ Name: name, Url: url, ThumbnailUrl: thumb });
         }
-        var headers = authHeader();
-        headers['Content-Type'] = 'application/json';
-        fetch('/IFrameChannels/Config', { method: 'POST', headers: headers, body: JSON.stringify(cfg) })
-            .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; })
-            .then(function() {
-                var el = document.getElementById('save-ok');
-                el.style.display = 'inline';
-                setTimeout(function() { el.style.display = 'none'; }, 3000);
-                renderGrid();
-            })
-            .catch(function(e) { alert('Save failed: ' + e); });
+        fetch('/IFrameChannels/Config', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify(cfg)
+        })
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status + ' — token: ' + (getToken() ? 'found' : 'missing'));
+            var ok = document.getElementById('save-ok');
+            ok.style.display = 'inline';
+            setTimeout(function() { ok.style.display = 'none'; }, 3000);
+            document.getElementById('save-err').style.display = 'none';
+            renderGrid();
+        })
+        .catch(function(e) {
+            var err = document.getElementById('save-err');
+            err.textContent = 'Save failed: ' + e;
+            err.style.display = 'block';
+        });
     }
 
+    /* ── Grid ── */
     function renderGrid() {
         var grid = document.getElementById('grid');
         grid.innerHTML = '';
@@ -168,6 +181,7 @@
         document.getElementById('channels-list').appendChild(row);
     }
 
+    /* ── Player ── */
     function openPlayer(name, url) {
         document.getElementById('player-title').textContent = name;
         document.getElementById('player-iframe').src = url;
@@ -190,16 +204,13 @@
         hideTimer = setTimeout(function() { document.getElementById('player-bar').classList.add('hidden'); }, 3000);
     }
 
+    /* ── Tabs ── */
     function showTab(id) {
         var tabs = document.querySelectorAll('.tab');
         var names = ['channels', 'settings'];
-        for (var i = 0; i < tabs.length; i++) {
-            tabs[i].classList.toggle('active', names[i] === id);
-        }
+        for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', names[i] === id);
         var contents = document.querySelectorAll('.tab-content');
-        for (var j = 0; j < contents.length; j++) {
-            contents[j].classList.remove('active');
-        }
+        for (var j = 0; j < contents.length; j++) contents[j].classList.remove('active');
         document.getElementById('tab-' + id).classList.add('active');
     }
 
